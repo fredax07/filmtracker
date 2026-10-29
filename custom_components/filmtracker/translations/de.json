@@ -1,0 +1,34 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Filmtracker",
+        "description": "Trag deinen kostenlosen TMDb-API-Key (v3) ein: themoviedb.org → Einstellungen → API → API-Schlüssel.",
+        "data": { "tmdb_key": "TMDb API-Key" }
+      }
+    },
+    "error": {
+      "invalid_auth": "Der API-Key ist ungültig.",
+      "cannot_connect": "TMDb ist nicht erreichbar."
+    },
+    "abort": { "single_instance_allowed": "Filmtracker ist bereits eingerichtet." }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Filmtracker",
+        "data": {
+          "ki_primary": "KI primär",
+          "ki_fallback": "KI Fallback (wenn primär ausfällt)",
+          "check_time": "Uhrzeit täglicher Check"
+        }
+      }
+    }
+  },
+  "services": {
+    "check_now": {
+      "name": "Jetzt prüfen",
+      "description": "Prüft die Listen aller Personen auf neue Folgen und neue Verfügbarkeit in den Abos und schickt Pushs."
+    }
+  }
+}

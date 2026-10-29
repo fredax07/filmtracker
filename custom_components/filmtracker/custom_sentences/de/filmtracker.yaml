@@ -1,0 +1,25 @@
+language: "de"
+intents:
+  FilmtrackerTipp:
+    data:
+      - sentences:
+          - "was (soll|kann|könnte) ich [heute] [noch] (schauen|gucken|ansehen)"
+          - "(gib|sag) mir [mal] einen (film|serien|schau)tipp"
+          - "(film|serien|schau)tipp [für heute]"
+          - "was läuft [heute] [bei mir]"
+  FilmtrackerNeueFolgen:
+    data:
+      - sentences:
+          - "gibt es neue folgen"
+          - "(welche|was für) neue folgen gibt es"
+          - "neue folgen [für mich]"
+          - "gibt es was neues bei meinen serien"
+  FilmtrackerWatchlist:
+    data:
+      - sentences:
+          - "(setz|setze|pack|packe|schreib|schreibe) {titel} auf [meine] (watchlist|merkliste)"
+          - "merk dir [den film|die serie] {titel}"
+          - "{titel} auf [meine] (watchlist|merkliste)"
+lists:
+  titel:
+    wildcard: true
