@@ -108,7 +108,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             ws_household,
             ws_abocheck,
             ws_admin_user,
-            ws_trakt_config,
             ws_trakt_start,
             ws_trakt_sync,
             ws_trakt_disconnect,
@@ -1751,25 +1750,6 @@ async def ws_admin_user(hass, connection, msg):
 
 
 # ---------- Trakt ----------
-@websocket_api.websocket_command(
-    {
-        vol.Required("type"): "filmtracker/trakt/config",
-        vol.Required("client_id"): vol.All(str, vol.Length(max=200)),
-        vol.Required("client_secret"): vol.All(str, vol.Length(max=200)),
-    }
-)
-@websocket_api.require_admin
-@websocket_api.async_response
-async def ws_trakt_config(hass, connection, msg):
-    if not (ft := _ft(hass, connection, msg)):
-        return
-    opts = ft.opts
-    opts[CONF_TRAKT_ID] = msg["client_id"].strip()
-    opts[CONF_TRAKT_SECRET] = msg["client_secret"].strip()
-    hass.config_entries.async_update_entry(ft.entry, options=opts)
-    connection.send_result(msg["id"], await ft.async_payload(connection))
-
-
 @websocket_api.websocket_command({vol.Required("type"): "filmtracker/trakt/start"})
 @websocket_api.async_response
 async def ws_trakt_start(hass, connection, msg):

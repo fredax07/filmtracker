@@ -2,27 +2,59 @@
   "config": {
     "step": {
       "user": {
-        "title": "Filmtracker",
-        "description": "Trag deinen kostenlosen TMDb-API-Key (v3) ein: themoviedb.org → Einstellungen → API → API-Schlüssel.",
-        "data": { "tmdb_key": "TMDb API-Key" }
+        "title": "Filmtracker einrichten",
+        "description": "Du brauchst einen kostenlosen **TMDb-API-Key (v3)**: [themoviedb.org → Einstellungen → API](https://www.themoviedb.org/settings/api).\n\nKI und Trakt sind optional und lassen sich später unter **Konfigurieren** ändern.",
+        "data": {
+          "tmdb_key": "TMDb API-Key (v3)",
+          "ki_primary": "KI primär",
+          "ki_fallback": "KI Fallback",
+          "trakt_client_id": "Trakt Client-ID",
+          "trakt_client_secret": "Trakt Client-Secret"
+        },
+        "data_description": {
+          "tmdb_key": "Pflicht – für Suche, Poster, Folgen und Streaming-Anbieter.",
+          "ki_primary": "Eine AI-Task-Entität (z. B. Ollama, OpenAI, Google) für Tipps.",
+          "ki_fallback": "Wird genutzt, wenn die primäre KI nicht antwortet.",
+          "trakt_client_id": "Optional. App anlegen auf trakt.tv/oauth/applications/new, Redirect-URI: urn:ietf:wg:oauth:2.0:oob",
+          "trakt_client_secret": "Gehört zur Client-ID."
+        }
       }
     },
     "error": {
-      "invalid_auth": "Der API-Key ist ungültig.",
-      "cannot_connect": "TMDb ist nicht erreichbar."
+      "invalid_auth": "Der TMDb-API-Key ist ungültig.",
+      "cannot_connect": "TMDb ist nicht erreichbar.",
+      "trakt_incomplete": "Für Trakt bitte Client-ID und Client-Secret eintragen (oder beide leer lassen)."
     },
-    "abort": { "single_instance_allowed": "Filmtracker ist bereits eingerichtet." }
+    "abort": {
+      "single_instance_allowed": "Filmtracker ist bereits eingerichtet."
+    }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Filmtracker",
+        "title": "Filmtracker-Einstellungen",
+        "description": "TMDb-Key: {tmdb} · Trakt: {trakt}\n\nKey- und Secret-Felder leer lassen, um die gespeicherten Werte zu behalten.",
         "data": {
+          "tmdb_key": "Neuer TMDb API-Key",
           "ki_primary": "KI primär",
-          "ki_fallback": "KI Fallback (wenn primär ausfällt)",
-          "check_time": "Uhrzeit täglicher Check"
+          "ki_fallback": "KI Fallback",
+          "check_time": "Uhrzeit täglicher Check",
+          "trakt_client_id": "Trakt Client-ID",
+          "trakt_client_secret": "Neues Trakt Client-Secret"
+        },
+        "data_description": {
+          "tmdb_key": "Nur ausfüllen, wenn du den Key ändern willst.",
+          "ki_fallback": "Wird genutzt, wenn die primäre KI nicht antwortet.",
+          "check_time": "Prüft täglich auf neue Folgen und neue Verfügbarkeit in den Abos.",
+          "trakt_client_id": "Leeren, um Trakt abzuschalten. App: trakt.tv/oauth/applications/new, Redirect-URI: urn:ietf:wg:oauth:2.0:oob",
+          "trakt_client_secret": "Nur ausfüllen beim ersten Einrichten oder zum Ändern."
         }
       }
+    },
+    "error": {
+      "invalid_auth": "Der TMDb-API-Key ist ungültig.",
+      "cannot_connect": "TMDb ist nicht erreichbar.",
+      "trakt_incomplete": "Für Trakt bitte Client-ID und Client-Secret eintragen (oder die Client-ID leeren)."
     }
   },
   "services": {

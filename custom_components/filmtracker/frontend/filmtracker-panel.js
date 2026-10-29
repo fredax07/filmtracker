@@ -251,6 +251,7 @@ async function openDetail(type, id) {
   $$("#modal [data-l]").forEach((b) => (b.onclick = async () => { d.list = b.dataset.l; if (d.list === "seen" && !d.watched) d.watched = today(); $$("#modal [data-l]").forEach((z) => z.classList.toggle("on", z === b)); await persist("→ " + LISTS[d.list]); }));
   const rs = $("#rate .stars");
   const rVal = (e) => { const b = rs.getBoundingClientRect(); return Math.min(10, Math.max(1, Math.ceil(((e.clientX - b.left) / b.width) * 10))); };
+  rs.removeAttribute("title");
   const rShow = (r) => { rs.firstChild.style.width = (r || 0) * 10 + "%"; $("#ratelbl").textContent = rateLbl(r); };
   rs.onmousemove = (e) => rShow(rVal(e));
   rs.onmouseleave = () => rShow(d.rating);
@@ -367,7 +368,7 @@ function recommendDialog(d) {
 function sharedDialog(list) {
   const people = S.u.people || [];
   const mem = new Set(list ? list.members.map((m) => m.id) : []);
-  const w = dialog('<h2 style="margin-top:0">' + (list ? "Liste bearbeiten" : "👥 Neue gemeinsame Liste") + '</h2><input type="text" id="slname" maxlength="60" placeholder="Name, z. B. „Filmabend mit Linchen“" value="' + esc(list ? list.name : "") + '"><div class="small muted" style="margin:8px 0 4px">Wer ist dabei?</div><div class="grid2">' + people.map((p) => '<label><input type="checkbox" value="' + p.id + '"' + (mem.has(p.id) ? " checked" : "") + ">" + esc(p.name) + "</label>").join("") + '</div><div class="row" style="margin-top:10px;justify-content:flex-end">' + (list ? '<button class="btn" data-leave style="margin-right:auto">Verlassen</button>' : "") + '<button class="btn" data-x>Abbrechen</button><button class="btn pri" data-ok>Speichern</button></div>');
+  const w = dialog('<h2 style="margin-top:0">' + (list ? "Liste bearbeiten" : "👥 Neue gemeinsame Liste") + '</h2><input type="text" id="slname" maxlength="60" placeholder="Name, z. B. „Filmabend“" value="' + esc(list ? list.name : "") + '"><div class="small muted" style="margin:8px 0 4px">Wer ist dabei?</div><div class="grid2">' + people.map((p) => '<label><input type="checkbox" value="' + p.id + '"' + (mem.has(p.id) ? " checked" : "") + ">" + esc(p.name) + "</label>").join("") + '</div><div class="row" style="margin-top:10px;justify-content:flex-end">' + (list ? '<button class="btn" data-leave style="margin-right:auto">Verlassen</button>' : "") + '<button class="btn" data-x>Abbrechen</button><button class="btn pri" data-ok>Speichern</button></div>');
   w.querySelector("[data-x]").onclick = () => w.remove();
   const lv = w.querySelector("[data-leave]"); if (lv) lv.onclick = async () => { if (!confirm("Liste „" + list.name + "“ verlassen?")) return; await wsU({ type: "filmtracker/shared/save", id: list.id, name: list.name, members: list.members.map((m) => m.id).filter((m) => m !== S.u.user_id) }); S.sharedSel = null; w.remove(); render(); };
   w.querySelector("[data-ok]").onclick = async () => {
@@ -398,7 +399,7 @@ function viewShared() {
   if (!S.sharedSel || !lists.find((l) => l.id === S.sharedSel)) S.sharedSel = lists[0] && lists[0].id;
   const cur = lists.find((l) => l.id === S.sharedSel);
   let html = '<div class="row" style="margin-bottom:10px">' + lists.map((l) => '<button class="btn sm' + (l.id === S.sharedSel ? " on" : "") + '" data-sl="' + l.id + '">' + esc(l.name) + " (" + Object.keys(l.items).length + ")</button>").join("") + '<button class="btn sm" id="slnew">＋ Neue Liste</button></div>';
-  if (!cur) { $("#main").innerHTML = html + '<div class="card"><b>Gemeinsame Listen</b><p class="small muted">Leg eine Liste an, z. B. „Filmabend“ oder „Mit Linchen schauen“. Alle Mitglieder sehen und bearbeiten sie und sehen, wer was schon gesehen und wie bewertet hat.</p></div>'; bind(); return; }
+  if (!cur) { $("#main").innerHTML = html + '<div class="card"><b>Gemeinsame Listen</b><p class="small muted">Leg eine Liste an, z. B. „Filmabend“ oder „Mit der Familie schauen“. Alle Mitglieder sehen und bearbeiten sie und sehen, wer was schon gesehen und wie bewertet hat.</p></div>'; bind(); return; }
   const items = Object.entries(cur.items).sort((a, b) => (a[1].seen - b[1].seen) || (b[1].added || "").localeCompare(a[1].added || ""));
   html += '<div class="card" style="padding:10px 14px"><div class="row"><div class="grow"><b>' + esc(cur.name) + '</b><div class="small muted">' + cur.members.map((m) => esc(m.id === S.u.user_id ? "Du" : m.name)).join(", ") + '</div></div><button class="btn sm" id="sledit">✎ Bearbeiten</button>' + (cur.owner === S.u.user_id || S.u.is_admin ? '<button class="btn sm" id="sldel">🗑</button>' : "") + '</div><div class="small muted" style="margin-top:6px">Titel hinzufügen: Titel öffnen → „Zu gemeinsamer Liste…“</div></div>';
   html += pollCard(cur);
@@ -563,7 +564,7 @@ function traktCard(u) {
   const t = u.trakt || {};
   let h = '<div class="card"><h2 style="margin-top:0">🔗 Trakt</h2>';
   if (!t.configured) {
-    h += u.is_admin ? '<div class="small muted">Einmalig für alle einrichten: Auf <a href="https://trakt.tv/oauth/applications/new" target="_blank">trakt.tv → Neue App</a> anlegen (Name egal, Redirect-URI: <code>urn:ietf:wg:oauth:2.0:oob</code>) und hier Client-ID und Client-Secret eintragen.</div><input type="text" id="tid" placeholder="Client-ID" style="margin-top:8px"><input type="text" id="tsec" placeholder="Client-Secret" style="margin-top:6px"><button class="btn sm" id="tsave" style="margin-top:6px">Speichern</button>' : '<div class="small muted">Trakt ist noch nicht eingerichtet. Das macht der Admin im ⚙-Tab.</div>';
+    h += '<div class="small muted">Trakt ist noch nicht eingerichtet.' + (u.is_admin ? ' Trag Client-ID und Client-Secret in den <a href="/config/integrations/integration/filmtracker" target="_top">Einstellungen der Integration</a> ein (⚙ → Konfigurieren).' : " Das macht der Admin in den Einstellungen der Integration.") + "</div>";
   } else if (!t.connected) {
     h += '<div class="small muted">Verbinde dein Trakt-Konto: Verlauf, Bewertungen und Watchlist werden dann in beide Richtungen abgeglichen (alle 6 Stunden).</div><button class="btn pri" id="tconnect" style="margin-top:8px">Mit Trakt verbinden</button><div id="tcode" style="margin-top:8px"></div>';
   } else {
@@ -572,7 +573,6 @@ function traktCard(u) {
   return h + "</div>";
 }
 function bindTrakt() {
-  const ts = $("#tsave"); if (ts) ts.onclick = async () => { try { await wsU({ type: "filmtracker/trakt/config", client_id: $("#tid").value, client_secret: $("#tsec").value }); toast("Trakt eingerichtet"); viewSettings(); } catch (e) { toast("Fehler: " + errMsg(e)); } };
   const tc = $("#tconnect"); if (tc) tc.onclick = async () => {
     tc.disabled = true;
     try {

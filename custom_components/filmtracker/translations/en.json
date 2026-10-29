@@ -1,0 +1,66 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Filmtracker",
+        "description": "You need a free **TMDb API key (v3)**: [themoviedb.org → Settings → API](https://www.themoviedb.org/settings/api).\n\nAI and Trakt are optional and can be changed later under **Configure**.",
+        "data": {
+          "tmdb_key": "TMDb API key (v3)",
+          "ki_primary": "Primary AI",
+          "ki_fallback": "Fallback AI",
+          "trakt_client_id": "Trakt client ID",
+          "trakt_client_secret": "Trakt client secret"
+        },
+        "data_description": {
+          "tmdb_key": "Required – used for search, posters, episodes and streaming providers.",
+          "ki_primary": "An AI task entity (e.g. Ollama, OpenAI, Google) for recommendations.",
+          "ki_fallback": "Used when the primary AI does not respond.",
+          "trakt_client_id": "Optional. Create an app at trakt.tv/oauth/applications/new, redirect URI: urn:ietf:wg:oauth:2.0:oob",
+          "trakt_client_secret": "Belongs to the client ID."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "The TMDb API key is invalid.",
+      "cannot_connect": "Cannot reach TMDb.",
+      "trakt_incomplete": "For Trakt enter both client ID and client secret (or leave both empty)."
+    },
+    "abort": {
+      "single_instance_allowed": "Filmtracker is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Filmtracker settings",
+        "description": "TMDb key: {tmdb} · Trakt: {trakt}\n\nLeave key and secret fields empty to keep the stored values.",
+        "data": {
+          "tmdb_key": "New TMDb API key",
+          "ki_primary": "Primary AI",
+          "ki_fallback": "Fallback AI",
+          "check_time": "Daily check time",
+          "trakt_client_id": "Trakt client ID",
+          "trakt_client_secret": "New Trakt client secret"
+        },
+        "data_description": {
+          "tmdb_key": "Only fill in to change the key.",
+          "ki_fallback": "Used when the primary AI does not respond.",
+          "check_time": "Daily check for new episodes and new availability on subscriptions.",
+          "trakt_client_id": "Clear to disable Trakt. App: trakt.tv/oauth/applications/new, redirect URI: urn:ietf:wg:oauth:2.0:oob",
+          "trakt_client_secret": "Only fill in on first setup or to change it."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "The TMDb API key is invalid.",
+      "cannot_connect": "Cannot reach TMDb.",
+      "trakt_incomplete": "For Trakt enter both client ID and client secret (or clear the client ID)."
+    }
+  },
+  "services": {
+    "check_now": {
+      "name": "Check now",
+      "description": "Checks everyone's lists for new episodes and new availability on their subscriptions and sends push notifications."
+    }
+  }
+}

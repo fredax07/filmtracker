@@ -17,18 +17,28 @@ Film- und Serien-Tracker als Home-Assistant-Integration – pro Person, mit Teil
 - Sensoren & Kalender pro Person, Dashboard-Karte `custom:filmtracker-card`, Statistik & Jahresrückblick, CSV-Export, FSK-Filter
 
 ## Installation (HACS)
-1. HACS → ⋮ → **Benutzerdefinierte Repositories** → URL dieses Repos, Typ **Integration**
-2. „Filmtracker“ installieren, Home Assistant neu starten
-3. Einstellungen → Geräte & Dienste → **Integration hinzufügen** → Filmtracker
-4. TMDb-API-Key eintragen ([kostenlos hier](https://www.themoviedb.org/settings/api))
-5. Nach dem ersten Start einmal neu starten, damit die Sprachbefehle aktiv werden
+[![In HACS öffnen](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=fredax07&repository=filmtracker&category=integration)
 
-Das Panel erscheint in der Seitenleiste als **Filmtracker**.
+1. HACS → ⋮ → **Benutzerdefinierte Repositories** → `https://github.com/fredax07/filmtracker`, Typ **Integration**
+2. „Filmtracker“ herunterladen und Home Assistant neu starten
+3. **Einstellungen → Geräte & Dienste → Integration hinzufügen → Filmtracker**
 
-## Trakt einrichten (optional)
-Admin: auf [trakt.tv/oauth/applications/new](https://trakt.tv/oauth/applications/new) eine App anlegen
-(Redirect-URI `urn:ietf:wg:oauth:2.0:oob`), Client-ID und Secret im ⚙-Tab eintragen.
-Danach kann jede Person ihr eigenes Konto verbinden.
+Das Panel erscheint danach in der Seitenleiste als **Filmtracker**.
+
+## Einrichtung
+Alle Zugangsdaten trägst du in der Integration ein, beim Hinzufügen oder später unter **Filmtracker → ⚙ Konfigurieren**:
+
+| Feld | Pflicht | Woher |
+|---|---|---|
+| TMDb API-Key (v3) | ✅ | Kostenlos: [themoviedb.org → Einstellungen → API](https://www.themoviedb.org/settings/api) |
+| KI primär / Fallback | – | Jede `ai_task`-Entität, z. B. Ollama, OpenAI oder Google Gemini |
+| Trakt Client-ID + Secret | – | [trakt.tv → Neue App](https://trakt.tv/oauth/applications/new), Redirect-URI: `urn:ietf:wg:oauth:2.0:oob` |
+| Uhrzeit täglicher Check | – | Standard: 09:07 |
+
+Gespeicherte Keys werden nie angezeigt. Lässt du ein Key-Feld leer, bleibt der bisherige Wert erhalten.
+Ist Trakt eingerichtet, verbindet jede Person ihr eigenes Konto im Panel unter ⚙.
+
+Für Sprachbefehle nach der ersten Einrichtung einmal neu starten.
 
 ## Hinweis
 This product uses the TMDB API but is not endorsed or certified by TMDB.
