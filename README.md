@@ -1,4 +1,4 @@
-<p align="center"><img src="custom_components/filmtracker/brand/logo@2x.png" alt="Filmtracker" width="420"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fredax07/filmtracker/main/custom_components/filmtracker/brand/logo@2x.png" alt="Filmtracker" width="420"></p>
 
 # Filmtracker für Home Assistant
 
