@@ -1,9 +1,11 @@
-# 🎬 Filmtracker für Home Assistant
+<p align="center"><img src="custom_components/filmtracker/brand/logo@2x.png" alt="Filmtracker" width="420"></p>
+
+# Filmtracker für Home Assistant
 
 Film- und Serien-Tracker als Home-Assistant-Integration – pro Person, mit Teilen im Haushalt.
 
 ## Funktionen
-- **TMDb-Suche**, Listen: Watchlist, Wunschliste, Läuft, Gesehen, Bewertung 1–10
+- **TMDb-Suche**, Listen: Watchlist, Wunschliste, Läuft, Gesehen, Bewertung mit 1–5 Sternen (auch halbe)
 - **Folgen-Tracking** mit Push bei neuen Folgen, tägliche Prüfung deiner Abos (Verfügbarkeit in DE)
 - **KI-Tipps** über jede `ai_task`-Entität (z. B. Ollama), mit Fallback-Modell
 - **Kino & Releases der Woche**, Leih-/Kauf-Alarm wenn ein Film digital erscheint

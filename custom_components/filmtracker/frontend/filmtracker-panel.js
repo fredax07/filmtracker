@@ -60,9 +60,10 @@ h2{font-size:16px;margin:18px 0 8px}
 .cast{display:flex;gap:10px;overflow-x:auto}
 .cast div{width:70px;flex:none;text-align:center;font-size:11px}
 .cast img,.cast .ph{width:70px;height:90px;object-fit:cover;border-radius:6px}
-.rate{display:flex;gap:3px;flex-wrap:wrap}
-.rate button{width:30px;height:30px;border-radius:6px;border:1px solid var(--line);background:var(--card2);cursor:pointer}
-.rate button.on{background:var(--warn);border-color:var(--warn);color:#000;font-weight:700}
+.stars{position:relative;display:inline-block;color:var(--line);letter-spacing:1px;line-height:1;white-space:nowrap}
+.stars>span{position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;color:var(--warn)}
+.rate{display:flex;align-items:center;gap:12px}
+.rate .stars{font-size:38px;cursor:pointer;user-select:none;letter-spacing:4px}
 details.season{border:1px solid var(--line);border-radius:8px;margin:6px 0;background:var(--card)}
 details.season summary{padding:8px 10px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
 .ep{display:flex;gap:8px;align-items:flex-start;padding:6px 10px;border-top:1px solid var(--line)}
@@ -114,12 +115,14 @@ async function fskFilter(arr, keyOf) {
 }
 async function wsU(msg) { S.u = await ws(msg); S.items = S.u.items || {}; return S.u; }
 const brief = (d) => ({ tmdb: d.tmdb, type: d.type, title: d.title, year: d.year, poster: d.poster, vote: d.vote, genres: d.genres || [] });
+function stars(r) { const v = Math.max(0, Math.min(10, +r || 0)); return '<span class="stars" title="' + rateLbl(v) + '"><span style="width:' + v * 10 + '%">★★★★★</span>★★★★★</span>'; }
+function rateLbl(r) { return r ? (r / 2).toLocaleString("de-DE") + " von 5" : "nicht bewertet"; }
 const LBL = { watchlist: "Watchlist", wish: "Wunschliste", running: "schaut gerade", seen: "gesehen" };
 function personLine(p) {
   const bits = [];
   if (p.list) bits.push(LBL[p.list] || p.list);
   if (p.progress != null) bits.push(p.progress + " %" + (p.next ? " · bei " + p.next : " · fertig"));
-  if (p.rating) bits.push('<span class="star">★ ' + p.rating + "/10</span>");
+  if (p.rating) bits.push(stars(p.rating));
   return "<b>" + esc(p.me ? "Du" : p.name) + "</b>: " + (bits.join(" · ") || "–");
 }
 
@@ -178,7 +181,7 @@ function render() {
 function itemRow(d, extra) {
   const p = d.poster ? '<img loading="lazy" src="' + IMG + "w185" + d.poster + '">' : '<div class="ph"></div>';
   const k = kOf(d.type, d.tmdb); const ex = S.items[k];
-  const chips = []; if (ex && ex.list) chips.push('<span class="chip acc">' + LISTS[ex.list] + "</span>"); if (ex && ex.rating) chips.push('<span class="chip">Meine: ' + ex.rating + "/10</span>");
+  const chips = []; if (ex && ex.list) chips.push('<span class="chip acc">' + LISTS[ex.list] + "</span>"); if (ex && ex.rating) chips.push('<span class="chip">Meine: ' + stars(ex.rating) + "</span>");
   return '<div class="item" data-k="' + k + '">' + p + '<div class="grow"><div class="t">' + esc(d.title) + '</div><div class="meta">' + (d.type === "tv" ? "Serie" : "Film") + (d.year ? " · " + d.year : "") + (d.vote ? ' · <span class="star">★ ' + d.vote + "</span>" : "") + "</div>" + (extra || "") + "<div>" + chips.join("") + '</div><div class="pl" data-pk="' + k + '">' + provLine(S.prov[k]) + "</div></div></div>";
 }
 function bindRows(root) {
@@ -236,7 +239,7 @@ async function openDetail(type, id) {
   m.innerHTML = '<div class="modal"><div class="sheet"><div class="hero" style="background-image:url(' + (x.backdrop_path ? IMG + "w780" + x.backdrop_path : "") + ')"><button class="close" id="cl">✕</button></div>' +
     '<div class="dhead">' + (d.poster ? '<img src="' + IMG + "w342" + d.poster + '">' : '<div class="ph" style="width:110px;height:165px"></div>') + '<div style="align-self:flex-end"><div style="font-size:20px;font-weight:700">' + esc(d.title) + '</div><div class="meta">' + (type === "tv" ? "Serie" : "Film") + " · " + esc(yr(x.release_date || x.first_air_date)) + " · " + esc(runtime) + '</div><div class="meta"><span class="star">★ ' + (d.vote || "–") + "</span> TMDb" + (imdb ? ' · <a target="_blank" href="https://www.imdb.com/title/' + imdb + '/">IMDb ↗</a>' : "") + (trailer ? ' · <a target="_blank" href="https://www.youtube.com/watch?v=' + trailer.key + '">Trailer ↗</a>' : "") + '</div><div class="meta">' + esc(d.genres.join(", ")) + "</div></div></div>" +
     '<div class="dbody"><div class="row" id="lists">' + Object.keys(LISTS).map((l) => '<button class="btn' + (d.list === l ? " on" : "") + '" data-l="' + l + '">' + LISTS[l] + "</button>").join("") + (cur ? '<button class="btn" id="del" title="Entfernen">🗑</button>' : "") + "</div>" +
-    '<h2>Meine Bewertung</h2><div class="rate" id="rate">' + Array.from({ length: 10 }, (_, i) => '<button data-r="' + (i + 1) + '" class="' + (d.rating === i + 1 ? "on" : "") + '">' + (i + 1) + "</button>").join("") + "</div>" +
+    '<h2>Meine Bewertung</h2><div class="rate" id="rate">' + stars(d.rating) + '<span id="ratelbl" class="muted">' + rateLbl(d.rating) + "</span></div>" +
     "<h2>Handlung</h2><div>" + esc(x.overview || "Keine Beschreibung vorhanden.") + "</div>" + (crew ? '<div class="meta" style="margin-top:6px">' + (type === "movie" ? "Regie: " : "Von: ") + esc(crew) + "</div>" : "") +
     '<h2>Teilen</h2><div class="row"><button class="btn" id="rec">👉 Empfehlen</button>' + (((S.u.shared || []).length) ? '<select id="toshared" style="width:auto"><option value="">➕ Zu gemeinsamer Liste…</option>' + S.u.shared.map((l) => '<option value="' + l.id + '"' + (l.items[k] ? " disabled" : "") + ">" + esc(l.name) + (l.items[k] ? " ✓" : "") + "</option>").join("") + "</select>" : '<button class="btn" id="newshared">👥 Gemeinsame Liste anlegen</button>') + '</div><div id="social" class="small" style="margin-top:8px"></div>' +
     "<h2>Wo schauen?</h2>" + provHtml + tvButtons(p) + (cast ? '<h2>Besetzung</h2><div class="cast">' + cast + "</div>" : "") +
@@ -246,7 +249,12 @@ async function openDetail(type, id) {
   $("#cl").onclick = closeDetail;
   const persist = async (msg) => { try { await saveItem(d); toast(msg || "Gespeichert"); } catch (e) { toast("Fehler: " + errMsg(e)); } };
   $$("#modal [data-l]").forEach((b) => (b.onclick = async () => { d.list = b.dataset.l; if (d.list === "seen" && !d.watched) d.watched = today(); $$("#modal [data-l]").forEach((z) => z.classList.toggle("on", z === b)); await persist("→ " + LISTS[d.list]); }));
-  $$("#modal [data-r]").forEach((b) => (b.onclick = async () => { const r = +b.dataset.r; d.rating = d.rating === r ? null : r; $$("#modal [data-r]").forEach((z) => z.classList.toggle("on", +z.dataset.r === d.rating)); if (!d.list) d.list = "seen"; $$("#modal [data-l]").forEach((z) => z.classList.toggle("on", z.dataset.l === d.list)); await persist(d.rating ? "Bewertet: " + d.rating + "/10" : "Bewertung entfernt"); }));
+  const rs = $("#rate .stars");
+  const rVal = (e) => { const b = rs.getBoundingClientRect(); return Math.min(10, Math.max(1, Math.ceil(((e.clientX - b.left) / b.width) * 10))); };
+  const rShow = (r) => { rs.firstChild.style.width = (r || 0) * 10 + "%"; $("#ratelbl").textContent = rateLbl(r); };
+  rs.onmousemove = (e) => rShow(rVal(e));
+  rs.onmouseleave = () => rShow(d.rating);
+  rs.onclick = async (e) => { const r = rVal(e); d.rating = d.rating === r ? null : r; rShow(d.rating); if (!d.list) d.list = "seen"; $$("#modal [data-l]").forEach((z) => z.classList.toggle("on", z.dataset.l === d.list)); await persist(d.rating ? "Bewertet: " + rateLbl(d.rating) : "Bewertung entfernt"); };
   const del = $("#del"); if (del) del.onclick = async () => { if (!confirm("„" + d.title + "“ aus allen Listen entfernen?")) return; await removeItem(k); toast("Entfernt"); closeDetail(); };
   if (type === "tv") bindSeasons(d, persist);
   $("#rec").onclick = () => recommendDialog(d);
@@ -290,7 +298,7 @@ function viewStats() {
   const eps = L.filter((x) => x.e).length, movies = L.length - eps, mins = L.reduce((a, x) => a + (+x.m || 0), 0);
   const allItems = Object.values(items);
   const rated = allItems.filter((d) => d.rating);
-  const avg = rated.length ? (rated.reduce((a, d) => a + d.rating, 0) / rated.length).toFixed(1) : "–";
+  const avg = rated.length ? (rated.reduce((a, d) => a + d.rating, 0) / rated.length / 2).toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " ★" : "–";
   const genre = {}; const perShow = {};
   for (const x of L) { const d = items[x.k]; if (!d) continue; for (const g of d.genres || []) genre[g] = (genre[g] || 0) + 1; if (x.e) perShow[x.k] = (perShow[x.k] || 0) + 1; }
   const topG = Object.entries(genre).sort((a, b) => b[1] - a[1]).slice(0, 6);
@@ -321,8 +329,8 @@ function viewStats() {
   };
   ws({ type: "filmtracker/household" }).then((h) => {
     const el = $("#hh"); if (!el) return;
-    let t = h.people.length ? '<div class="list">' + h.people.map((p) => '<div class="card" style="margin:0 0 8px"><b>' + esc(p.me ? "Du" : p.name) + '</b><div class="small muted">' + p.movies + " Filme · " + p.eps + " Folgen · " + p.hours + " Std." + (p.genre ? " · mag " + esc(p.genre) : "") + (p.avg ? " · Ø ★ " + p.avg : "") + "</div></div>").join("") + "</div>" : "";
-    if (h.top.length) t += '<h2>❤ Haushalts-Lieblinge</h2><div class="list">' + h.top.map((a) => itemRow({ tmdb: a.tmdb, type: a.type, title: a.title, poster: a.poster }, '<div class="small">' + esc(a.who.join(", ")) + (a.avg ? ' · <span class="star">Ø ★ ' + a.avg + "</span>" : "") + "</div>")).join("") + "</div>";
+    let t = h.people.length ? '<div class="list">' + h.people.map((p) => '<div class="card" style="margin:0 0 8px"><b>' + esc(p.me ? "Du" : p.name) + '</b><div class="small muted">' + p.movies + " Filme · " + p.eps + " Folgen · " + p.hours + " Std." + (p.genre ? " · mag " + esc(p.genre) : "") + (p.avg ? " · Ø " + stars(p.avg) : "") + "</div></div>").join("") + "</div>" : "";
+    if (h.top.length) t += '<h2>❤ Haushalts-Lieblinge</h2><div class="list">' + h.top.map((a) => itemRow({ tmdb: a.tmdb, type: a.type, title: a.title, poster: a.poster }, '<div class="small">' + esc(a.who.join(", ")) + (a.avg ? " · Ø " + stars(a.avg) : "") + "</div>")).join("") + "</div>";
     el.innerHTML = t || '<div class="small muted">Noch keine Daten aus dem Haushalt.</div>'; bindRows(el);
   }).catch(() => { const el = $("#hh"); if (el) el.innerHTML = ""; });
   $$("#main [data-y]").forEach((b) => (b.onclick = () => { S.statYear = b.dataset.y; viewStats(); }));
