@@ -3,14 +3,30 @@ name: Release
 on:
   push:
     branches: [main]
-    paths: [custom_components/filmtracker/manifest.json, RELEASE_NOTES.md]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  hassfest:
+    name: Hassfest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: hacs/action@main
+        with:
+          category: integration
+
   release:
+    name: Release anlegen
+    needs: [hassfest, hacs]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
