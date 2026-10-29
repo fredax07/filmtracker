@@ -1,14 +1,27 @@
 {
   "domain": "filmtracker",
   "name": "Filmtracker",
-  "codeowners": ["@Fredax"],
+  "codeowners": [
+    "@fredax07"
+  ],
   "config_flow": true,
-  "dependencies": ["http", "frontend", "panel_custom", "websocket_api"],
-  "after_dependencies": ["ai_task", "notify", "person", "mobile_app"],
-  "documentation": "https://www.themoviedb.org/documentation/api",
+  "dependencies": [
+    "http",
+    "frontend",
+    "panel_custom",
+    "websocket_api"
+  ],
+  "after_dependencies": [
+    "ai_task",
+    "notify",
+    "person",
+    "mobile_app"
+  ],
+  "documentation": "https://github.com/fredax07/filmtracker",
   "integration_type": "service",
   "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/fredax07/filmtracker/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "1.4.0"
+  "version": "1.4.1"
 }
