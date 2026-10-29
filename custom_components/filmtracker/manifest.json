@@ -1,6 +1,12 @@
 {
   "domain": "filmtracker",
   "name": "Filmtracker",
+  "after_dependencies": [
+    "ai_task",
+    "notify",
+    "person",
+    "mobile_app"
+  ],
   "codeowners": [
     "@fredax07"
   ],
@@ -11,17 +17,11 @@
     "panel_custom",
     "websocket_api"
   ],
-  "after_dependencies": [
-    "ai_task",
-    "notify",
-    "person",
-    "mobile_app"
-  ],
   "documentation": "https://github.com/fredax07/filmtracker",
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/fredax07/filmtracker/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "1.5.2"
+  "version": "1.5.3"
 }

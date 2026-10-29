@@ -1,6 +1,8 @@
 {
   "name": "Filmtracker",
   "render_readme": true,
-  "homeassistant": "2025.1.0",
-  "country": ["DE"]
+  "homeassistant": "2025.8.0",
+  "country": [
+    "DE"
+  ]
 }
