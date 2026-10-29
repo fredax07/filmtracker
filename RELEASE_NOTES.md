@@ -1,3 +1,3 @@
-## Neu in 1.5.4
-- ✅ Hassfest-Prüfung bestanden: Links in der Einrichtung als Platzhalter
-- 🔧 GitHub-Workflows auf aktuelle Versionen
+## Neu in 1.5.5
+- 🏷 Kategorie „Medien & Unterhaltung → TV & Streaming“ für den Home-Assistant-Marketplace
+- ✅ Hassfest und HACS-Prüfung ohne Ausnahmen bestanden
