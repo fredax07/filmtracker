@@ -28,6 +28,11 @@ from .const import (
 PASSWORD = selector.TextSelector(selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD))
 TEXT = selector.TextSelector()
 AI = selector.EntitySelector(selector.EntitySelectorConfig(domain="ai_task"))
+LINKS = {
+    "tmdb_url": "https://www.themoviedb.org/settings/api",
+    "trakt_url": "https://trakt.tv/oauth/applications/new",
+    "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
+}
 
 
 async def _validate_key(hass, key: str) -> str | None:
@@ -82,6 +87,7 @@ class FilmtrackerConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
+            description_placeholders=LINKS,
         )
 
     @staticmethod
@@ -132,6 +138,7 @@ class FilmtrackerOptionsFlow(OptionsFlow):
             data_schema=schema,
             errors=errors,
             description_placeholders={
+                **LINKS,
                 "tmdb": "✓" if self.config_entry.data.get(CONF_TMDB_KEY) else "✗",
                 "trakt": "✓" if current.get(CONF_TRAKT_SECRET) else "✗",
             },

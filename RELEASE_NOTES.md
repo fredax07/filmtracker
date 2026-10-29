@@ -1,3 +1,3 @@
-## Neu in 1.5.3
-- ✅ Automatische Prüfung mit Hassfest und HACS-Validierung bei jedem Upload
-- 🔧 manifest.json nach Home-Assistant-Vorgaben sortiert, Mindestversion Home Assistant 2025.8
+## Neu in 1.5.4
+- ✅ Hassfest-Prüfung bestanden: Links in der Einrichtung als Platzhalter
+- 🔧 GitHub-Workflows auf aktuelle Versionen

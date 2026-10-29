@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Set up Filmtracker",
-        "description": "You need a free **TMDb API key (v3)**: [themoviedb.org → Settings → API](https://www.themoviedb.org/settings/api).\n\nAI and Trakt are optional and can be changed later under **Configure**.",
+        "description": "You need a free **TMDb API key (v3)**: [themoviedb.org → Settings → API]({tmdb_url}).\n\nAI and Trakt are optional and can be changed later under **Configure**.",
         "data": {
           "tmdb_key": "TMDb API key (v3)",
           "ki_primary": "Primary AI",
@@ -15,7 +15,7 @@
           "tmdb_key": "Required – used for search, posters, episodes and streaming providers.",
           "ki_primary": "An AI task entity (e.g. Ollama, OpenAI, Google) for recommendations.",
           "ki_fallback": "Used when the primary AI does not respond.",
-          "trakt_client_id": "Optional. Create an app at trakt.tv/oauth/applications/new, redirect URI: urn:ietf:wg:oauth:2.0:oob",
+          "trakt_client_id": "Optional. Create an app at {trakt_url}, redirect URI: {redirect_uri}",
           "trakt_client_secret": "Belongs to the client ID."
         }
       }
@@ -46,7 +46,7 @@
           "tmdb_key": "Only fill in to change the key.",
           "ki_fallback": "Used when the primary AI does not respond.",
           "check_time": "Daily check for new episodes and new availability on subscriptions.",
-          "trakt_client_id": "Clear to disable Trakt. App: trakt.tv/oauth/applications/new, redirect URI: urn:ietf:wg:oauth:2.0:oob",
+          "trakt_client_id": "Clear to disable Trakt. App: {trakt_url}, redirect URI: {redirect_uri}",
           "trakt_client_secret": "Only fill in on first setup or to change it."
         }
       }

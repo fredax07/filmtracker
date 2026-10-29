@@ -1,7 +1,7 @@
 """Konstanten für Filmtracker."""
 
 DOMAIN = "filmtracker"
-VERSION = "1.5.3"
+VERSION = "1.5.4"
 SIGNAL_UPDATE = "filmtracker_update"
 CONF_APPS = "apps"
 # TMDb-Anbieter-ID -> Android-TV-App

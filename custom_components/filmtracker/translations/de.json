@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Filmtracker einrichten",
-        "description": "Du brauchst einen kostenlosen **TMDb-API-Key (v3)**: [themoviedb.org → Einstellungen → API](https://www.themoviedb.org/settings/api).\n\nKI und Trakt sind optional und lassen sich später unter **Konfigurieren** ändern.",
+        "description": "Du brauchst einen kostenlosen **TMDb-API-Key (v3)**: [themoviedb.org → Einstellungen → API]({tmdb_url}).\n\nKI und Trakt sind optional und lassen sich später unter **Konfigurieren** ändern.",
         "data": {
           "tmdb_key": "TMDb API-Key (v3)",
           "ki_primary": "KI primär",
@@ -15,7 +15,7 @@
           "tmdb_key": "Pflicht – für Suche, Poster, Folgen und Streaming-Anbieter.",
           "ki_primary": "Eine AI-Task-Entität (z. B. Ollama, OpenAI, Google) für Tipps.",
           "ki_fallback": "Wird genutzt, wenn die primäre KI nicht antwortet.",
-          "trakt_client_id": "Optional. App anlegen auf trakt.tv/oauth/applications/new, Redirect-URI: urn:ietf:wg:oauth:2.0:oob",
+          "trakt_client_id": "Optional. App anlegen auf {trakt_url}, Redirect-URI: {redirect_uri}",
           "trakt_client_secret": "Gehört zur Client-ID."
         }
       }
@@ -46,7 +46,7 @@
           "tmdb_key": "Nur ausfüllen, wenn du den Key ändern willst.",
           "ki_fallback": "Wird genutzt, wenn die primäre KI nicht antwortet.",
           "check_time": "Prüft täglich auf neue Folgen und neue Verfügbarkeit in den Abos.",
-          "trakt_client_id": "Leeren, um Trakt abzuschalten. App: trakt.tv/oauth/applications/new, Redirect-URI: urn:ietf:wg:oauth:2.0:oob",
+          "trakt_client_id": "Leeren, um Trakt abzuschalten. App: {trakt_url}, Redirect-URI: {redirect_uri}",
           "trakt_client_secret": "Nur ausfüllen beim ersten Einrichten oder zum Ändern."
         }
       }
