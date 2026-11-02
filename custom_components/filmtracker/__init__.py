@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import random
@@ -53,6 +54,12 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# SHA-256 aller bisher ausgelieferten Versionen von custom_sentences/de/filmtracker.yaml.
+# Nur eine unveränderte Kopie davon darf beim Update ersetzt werden.
+SHIPPED_SENTENCES = {
+    "69f51d36ceeae486b7d2436cd9b097c61f4134744c6cac8cf5e9b6966aa03b27",
+}
+
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}.data"
 PATH_RE = re.compile(r"^[a-z0-9_/]+$")
@@ -74,12 +81,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN] = ft
 
     def _install_sentences() -> bool:
+        """Sprachbefehle kopieren, ohne Änderungen des Nutzers zu überschreiben.
+
+        Neu angelegt wird die Datei nur, wenn sie fehlt. Ersetzt wird sie nur,
+        wenn sie noch eine unveränderte Kopie einer früher ausgelieferten Version ist.
+        """
         src = Path(__file__).parent / "custom_sentences" / "de" / "filmtracker.yaml"
         dst = Path(hass.config.path("custom_sentences", "de", "filmtracker.yaml"))
-        if not src.exists() or (dst.exists() and dst.read_bytes() == src.read_bytes()):
+        if not src.exists():
             return False
+        new = src.read_bytes()
+        if dst.exists():
+            cur = dst.read_bytes()
+            if cur == new or hashlib.sha256(cur).hexdigest() not in SHIPPED_SENTENCES:
+                return False
         dst.parent.mkdir(parents=True, exist_ok=True)
-        dst.write_bytes(src.read_bytes())
+        dst.write_bytes(new)
         return True
 
     if await hass.async_add_executor_job(_install_sentences):
@@ -247,7 +264,23 @@ class Filmtracker:
             self.data = stored
         self.data.setdefault("users", {})
         self.data.setdefault("shared", {})
+        self._sanitize_store()
         await self.async_refresh_names()
+
+    def _sanitize_store(self) -> None:
+        """Gespeicherte Titel prüfen, auch solche aus älteren Versionen."""
+        for u in self.data["users"].values():
+            for d in (u.get("items") or {}).values():
+                if isinstance(d, dict):
+                    _sanitize(d)
+            for r in u.get("inbox") or []:
+                if isinstance(r, dict) and isinstance(r.get("item"), dict):
+                    r["item"] = _brief(r["item"])
+        for sl in self.data["shared"].values():
+            for k, it in list((sl.get("items") or {}).items()):
+                if isinstance(it, dict):
+                    extra = {x: it[x] for x in ("by", "by_name", "added", "seen") if x in it}
+                    sl["items"][k] = {**_brief(it), **extra}
 
     async def async_refresh_names(self) -> None:
         users = await self.hass.auth.async_get_users()
@@ -1181,13 +1214,63 @@ def _ft(hass: HomeAssistant, connection, msg) -> Filmtracker | None:
     return ft
 
 
+_RE_POSTER = re.compile(r"^/[A-Za-z0-9._-]+$")
+_RE_YEAR = re.compile(r"^\d{4}$")
+_RE_EP = re.compile(r"^\d{1,3}x\d{1,4}$")
+_RE_DATE = re.compile(r"^[0-9T:.+\-Z ]{0,40}$")
+
+
+def _num(value: Any, lo: float, hi: float) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return None
+    return n if lo <= n <= hi else None
+
+
+def _sanitize(item: dict[str, Any]) -> dict[str, Any]:
+    """Felder, die anderen Personen angezeigt werden, auf erlaubte Werte begrenzen."""
+    title = item.get("title")
+    item["title"] = str(title)[:300] if title is not None else ""
+    year = str(item.get("year") or "")[:4]
+    item["year"] = year if _RE_YEAR.match(year) else ""
+    poster = item.get("poster")
+    item["poster"] = poster if isinstance(poster, str) and _RE_POSTER.match(poster) else None
+    vote = _num(item.get("vote"), 0, 10)
+    item["vote"] = round(vote, 1) if vote is not None else None
+    genres = item.get("genres")
+    item["genres"] = [g[:60] for g in genres if isinstance(g, str)][:15] if isinstance(genres, list) else []
+    rating = _num(item.get("rating"), 1, 10)
+    item["rating"] = int(round(rating)) if rating is not None else None
+    eps = item.get("eps")
+    item["eps"] = [e for e in eps if isinstance(e, str) and _RE_EP.match(e)][:5000] if isinstance(eps, list) else []
+    seasons = item.get("seasons")
+    if isinstance(seasons, dict):
+        item["seasons"] = {
+            str(k): int(v) for k, v in seasons.items() if str(k).isdigit() and _num(v, 0, 5000) is not None
+        } or None
+    else:
+        item["seasons"] = None
+    runtime = _num(item.get("runtime"), 0, 1000)
+    item["runtime"] = int(runtime) if runtime is not None else None
+    for key in ("added", "watched", "updated"):
+        if key in item and not (isinstance(item[key], str) and _RE_DATE.match(item[key])):
+            item.pop(key)
+    return item
+
+
 def _clean_item(raw: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(raw, dict) or raw.get("type") not in ("movie", "tv"):
         raise vol.Invalid("type")
     item = dict(raw)
     item["tmdb"] = int(item["tmdb"])
+    if item["tmdb"] <= 0:
+        raise vol.Invalid("tmdb")
     if item.get("list") not in (*LISTS, None):
         item["list"] = None
+    _sanitize(item)
     if len(json.dumps(item)) > 30000:
         raise vol.Invalid("zu groß")
     return item
@@ -1196,7 +1279,12 @@ def _clean_item(raw: dict[str, Any]) -> dict[str, Any]:
 def _brief(item: dict[str, Any]) -> dict[str, Any]:
     """Nur die Stammdaten eines Titels (für Teilen)."""
     keep = ("tmdb", "type", "title", "year", "poster", "vote", "genres")
-    return {k: item.get(k) for k in keep}
+    clean = _sanitize({k: item.get(k) for k in keep})
+    try:
+        clean["tmdb"] = int(clean["tmdb"])
+    except (TypeError, ValueError):
+        clean["tmdb"] = None
+    return {k: clean.get(k) for k in keep}
 
 
 @websocket_api.websocket_command({vol.Required("type"): "filmtracker/get"})

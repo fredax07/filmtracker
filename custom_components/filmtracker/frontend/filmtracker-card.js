@@ -10,6 +10,7 @@
     shared: "Gemeinsame Listen",
   };
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const safePath = (p) => (typeof p === "string" && /^\/[A-Za-z0-9._-]+$/.test(p) ? p : "");
   const kOf = (d) => d.type + ":" + d.tmdb;
   let CACHE = null, CACHE_AT = 0, PENDING = null;
   const REL = {};
@@ -131,11 +132,11 @@
       rows = rows.filter((x) => x.group || n++ < lim);
       const bd = r.getElementById("bd");
       if (!rows.filter((x) => !x.group).length) { bd.innerHTML = '<div class="empty">' + ({ next: "Keine Serie am Laufen.", releases: "Diese Woche keine neuen Folgen.", inbox: "Keine Empfehlungen.", shared: "Gemeinsame Listen sind leer." }[c.mode] || "Liste ist leer.") + "</div>"; return; }
-      const img = (d) => (d.poster ? '<img loading="lazy" src="' + IMG + d.poster + '">' : '<div class="ph"></div>');
+      const img = (d) => (safePath(d.poster) ? '<img loading="lazy" src="' + IMG + safePath(d.poster) + '">' : '<div class="ph"></div>');
       if (c.layout === "posters") {
-        bd.innerHTML = '<div class="posters">' + rows.filter((x) => !x.group).map((x) => '<div class="p" data-k="' + kOf(x.d) + '">' + img(x.d) + '<div class="t">' + esc(x.d.title) + '</div><div class="m">' + esc(x.sub) + "</div></div>").join("") + "</div>";
+        bd.innerHTML = '<div class="posters">' + rows.filter((x) => !x.group).map((x) => '<div class="p" data-k="' + esc(kOf(x.d)) + '">' + img(x.d) + '<div class="t">' + esc(x.d.title) + '</div><div class="m">' + esc(x.sub) + "</div></div>").join("") + "</div>";
       } else {
-        bd.innerHTML = rows.map((x) => x.group ? '<div class="grp">' + esc(x.group) + "</div>" : '<div class="row" data-k="' + kOf(x.d) + '">' + img(x.d) + '<div class="grow"><div class="t">' + esc(x.d.title) + '</div><div class="m">' + esc(x.sub) + "</div>" + (x.pr != null ? '<div class="bar"><i style="width:' + x.pr + '%"></i></div>' : "") + "</div></div>").join("");
+        bd.innerHTML = rows.map((x) => x.group ? '<div class="grp">' + esc(x.group) + "</div>" : '<div class="row" data-k="' + esc(kOf(x.d)) + '">' + img(x.d) + '<div class="grow"><div class="t">' + esc(x.d.title) + '</div><div class="m">' + esc(x.sub) + "</div>" + (x.pr != null ? '<div class="bar"><i style="width:' + x.pr + '%"></i></div>' : "") + "</div></div>").join("");
       }
       bd.querySelectorAll("[data-k]").forEach((el) => (el.onclick = () => this._nav("?open=" + el.dataset.k)));
     }
