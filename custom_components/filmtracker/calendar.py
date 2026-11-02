@@ -54,13 +54,13 @@ class FilmtrackerCalendar(CalendarEntity):
     @property
     def event(self) -> CalendarEvent | None:
         today = dt_util.now().date().isoformat()
-        upcoming = [e for e in self.ft.event_data(self.uid) if e["date"] >= today]
+        upcoming = [e for e in self.ft.event_data(self.uid, public=True) if e["date"] >= today]
         return _event(upcoming[0]) if upcoming else None
 
     async def async_get_events(self, hass: HomeAssistant, start_date: datetime, end_date: datetime) -> list[CalendarEvent]:
         start, end = dt_util.as_local(start_date).date(), dt_util.as_local(end_date).date()
         out = []
-        for e in self.ft.event_data(self.uid):
+        for e in self.ft.event_data(self.uid, public=True):
             d = date.fromisoformat(e["date"])
             if start <= d <= end:
                 out.append(_event(e))

@@ -68,6 +68,6 @@ class FilmtrackerSensor(SensorEntity):
         self.async_write_ha_state()
 
     def _compute(self) -> None:
-        value, attrs = self.ft.sensor_value(self.uid, self.kind)
+        value, attrs = self.ft.sensor_value(self.uid, self.kind, public=True)
         self._attr_native_value = value
         self._attr_extra_state_attributes = attrs

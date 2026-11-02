@@ -1,4 +1,5 @@
-## Neu in 1.5.7
-- 🔒 **Sicherheit:** Titel-Daten (Poster, Wertung, Jahr, Bewertung, Folgen u. a.) werden auf dem Server geprüft, bevor sie gespeichert oder mit anderen Personen geteilt werden. Bereits gespeicherte Daten werden beim Start bereinigt.
-- 🔒 **Sicherheit:** Panel und Dashboard-Karte maskieren alle angezeigten Werte und laden nur gültige TMDb-Bildpfade.
-- 🗣 **Sprachbefehle:** `custom_sentences/de/filmtracker.yaml` wird nur noch angelegt, wenn die Datei fehlt, oder ersetzt, wenn sie eine unveränderte Kopie einer ausgelieferten Version ist. Eigene Anpassungen bleiben erhalten.
+## Neu in 1.5.8
+- 🔒 **Privatsphäre:** Ist „Andere dürfen sehen, was ich schaue“ aus, zeigen die Sensoren und der Kalender dieser Person in Home Assistant keine Titel mehr – nur noch Zahlen und „Neue Folge“.
+- 🔞 **FSK serverseitig:** Die Altersgrenze wird jetzt auch auf dem Server durchgesetzt – für Suche, Entdecken, Trends, Detailansichten, Empfehlungen, gemeinsame Listen und Sprachbefehle.
+- 🔒 **Sicherheit:** IMDb- und Trailer-Links werden geprüft und maskiert.
+- 🔒 **Sicherheit:** Fehlermeldungen von TMDb enthalten nie mehr den API-Key.

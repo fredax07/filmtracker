@@ -37,7 +37,7 @@ class TipIntent(_Base):
 
     async def async_handle(self, intent_obj: intent.Intent) -> intent.IntentResponse:
         ft, uid = self._who(intent_obj)
-        return self._say(intent_obj, ft.voice_tip(uid))
+        return self._say(intent_obj, await ft.async_voice_tip(uid))
 
 
 class NewEpisodesIntent(_Base):

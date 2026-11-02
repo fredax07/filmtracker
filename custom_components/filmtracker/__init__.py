@@ -63,6 +63,12 @@ SHIPPED_SENTENCES = {
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}.data"
 PATH_RE = re.compile(r"^[a-z0-9_/]+$")
+_TMDB_DETAIL = re.compile(r"^(movie|tv)/(\d+)$")
+_TMDB_LIST = re.compile(
+    r"^(search/(multi|movie|tv)|discover/(movie|tv)|trending/(all|movie|tv)/(day|week)"
+    r"|(movie|tv)/(popular|top_rated|now_playing|upcoming|airing_today|on_the_air)"
+    r"|(movie|tv)/\d+/(recommendations|similar))$"
+)
 CACHE_TTL = 6 * 3600
 LISTS = ("watchlist", "wish", "running", "seen")
 ACTIVE = ("watchlist", "wish", "running")
@@ -394,9 +400,12 @@ class Filmtracker:
         parts = [p for p in parts if p]
         return parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " und " + parts[-1]
 
-    def voice_tip(self, uid: str | None) -> str:
+    async def async_voice_tip(self, uid: str | None) -> str:
         u = self.data["users"].get(uid or "") or {}
         items = u.get("items") or {}
+        if self.fsk_max(uid) is not None:
+            ok = await self.fsk_allowed(uid, list(items))
+            items = {k: d for k, d in items.items() if k in ok}
         abos = set(self.abos_for(u)) if u else set()
         tips: list[str] = []
         running = [d for d in items.values() if d.get("type") == "tv" and d.get("list") == "running" and _next_ep(d)]
@@ -424,6 +433,7 @@ class Filmtracker:
             return "Ich weiß nicht, für wen ich das merken soll."
         try:
             r = await self.tmdb("search/multi", {"query": title, "include_adult": "false"})
+            r = await self.fsk_filter_tmdb(uid, "search/multi", r)
         except Exception:  # noqa: BLE001
             return "Ich komme gerade nicht an die Filmdatenbank."
         x = next((z for z in r.get("results") or [] if z.get("media_type") in ("movie", "tv")), None)
@@ -448,6 +458,49 @@ class Filmtracker:
         return f"{kind} {name}{f' von {year}' if year else ''} ist jetzt auf deiner Watchlist."
 
     # ---------- FSK ----------
+    def fsk_max(self, uid: str | None) -> int | None:
+        return (self.data["users"].get(uid or "") or {}).get("max_fsk")
+
+    async def fsk_allowed(self, uid: str | None, keys: list[str]) -> set[str]:
+        """Titel, die eine Person mit Altersgrenze sehen darf (unbekannte Freigabe = nein)."""
+        keys = list(dict.fromkeys(keys))
+        limit = self.fsk_max(uid)
+        if limit is None:
+            return set(keys)
+        sem = asyncio.Semaphore(6)
+
+        async def one(key: str) -> tuple[str, int | None]:
+            async with sem:
+                return key, await self.cert(key)
+
+        return {k for k, c in await asyncio.gather(*(one(k) for k in keys)) if c is not None and c <= limit}
+
+    async def fsk_filter_tmdb(self, uid: str, path: str, res: Any) -> Any:
+        """TMDb-Antworten für Personen mit Altersgrenze filtern."""
+        if self.fsk_max(uid) is None:
+            return res
+        if m := _TMDB_DETAIL.match(path):
+            key = f"{m[1]}:{m[2]}"
+            if key not in await self.fsk_allowed(uid, [key]):
+                raise HomeAssistantError("Dieser Titel ist für dich nicht freigegeben (FSK)")
+            return res
+        if not _TMDB_LIST.match(path) or not isinstance(res, dict) or not isinstance(res.get("results"), list):
+            return res
+        default = "tv" if path.startswith(("tv/", "search/tv", "discover/tv", "trending/tv")) else "movie"
+        mixed = path.startswith(("search/multi", "trending/all"))
+
+        def key_of(x: Any) -> str | None:
+            if not isinstance(x, dict) or not isinstance(x.get("id"), int):
+                return None
+            typ = x.get("media_type") or (None if mixed else default)
+            return f"{typ}:{x['id']}" if typ in ("movie", "tv") else None
+
+        keys = [k for k in map(key_of, res["results"]) if k]
+        ok = await self.fsk_allowed(uid, keys)
+        res = dict(res)
+        res["results"] = [x for x in res["results"] if (key_of(x) is None and not (isinstance(x, dict) and x.get("media_type") in ("movie", "tv"))) or key_of(x) in ok]
+        return res
+
     async def cert(self, key: str) -> int | None:
         typ, _, tid = key.partition(":")
         try:
@@ -508,7 +561,12 @@ class Filmtracker:
         people.sort(key=lambda p: p["eps"] + p["movies"], reverse=True)
         return {"year": year, "people": people, "top": top[:8]}
 
-    def event_data(self, uid: str) -> list[dict[str, Any]]:
+    def is_private(self, uid: str) -> bool:
+        return not (self.data["users"].get(uid) or {}).get("share", True)
+
+    def event_data(self, uid: str, public: bool = False) -> list[dict[str, Any]]:
+        """Termine einer Person. public=True: für HA-Entitäten, die alle Nutzer lesen können."""
+        hide = public and self.is_private(uid)
         items = (self.data["users"].get(uid) or {}).get("items") or {}
         out: list[dict[str, Any]] = []
         for k, d in items.items():
@@ -521,8 +579,8 @@ class Filmtracker:
                     if e:
                         out.append({
                             "date": e["date"], "kind": "ep", "key": k,
-                            "summary": f"📺 {d.get('title')} S{e['s']}E{e['e']}",
-                            "description": e.get("name") or "",
+                            "summary": "📺 Neue Folge" if hide else f"📺 {d.get('title')} S{e['s']}E{e['e']}",
+                            "description": "" if hide else e.get("name") or "",
                         })
             elif d.get("type") == "movie" and d.get("list") in ("watchlist", "wish"):
                 done = set()
@@ -531,15 +589,22 @@ class Filmtracker:
                         done.add((r["date"], r["type"]))
                         out.append({
                             "date": r["date"], "kind": "movie", "key": k,
-                            "summary": f"🎬 {d.get('title')} – {RELEASE_TYPES[r['type']]}",
+                            "summary": f"🎬 {'Film' if hide else d.get('title')} – {RELEASE_TYPES[r['type']]}",
                             "description": "",
                         })
                 if not done and m.get("release"):
-                    out.append({"date": m["release"], "kind": "movie", "key": k, "summary": f"🎬 {d.get('title')} – Release", "description": ""})
-        uniq = {(e["date"], e["summary"]): e for e in out}
+                    out.append({"date": m["release"], "kind": "movie", "key": k, "summary": f"🎬 {'Film' if hide else d.get('title')} – Release", "description": ""})
+        uniq = {(e["date"], e["summary"], e["key"]): e for e in out}
         return sorted(uniq.values(), key=lambda e: e["date"])
 
-    def sensor_value(self, uid: str, kind: str) -> tuple[Any, dict[str, Any]]:
+    def sensor_value(self, uid: str, kind: str, public: bool = False) -> tuple[Any, dict[str, Any]]:
+        """Wert und Attribute eines Sensors. public=True: ohne Titel, wenn die Person nicht teilt."""
+        value, attrs = self._sensor_value(uid, kind)
+        if public and self.is_private(uid) and kind != "year":
+            attrs = {"privat": True}
+        return value, attrs
+
+    def _sensor_value(self, uid: str, kind: str) -> tuple[Any, dict[str, Any]]:
         u = self.data["users"].get(uid) or {}
         items = u.get("items") or {}
         today = dt_util.now().date()
@@ -1023,6 +1088,15 @@ class Filmtracker:
         uid = connection.user.id
         u = self.user(uid)
         o = self.opts
+        inbox = u.get("inbox", [])
+        shared = self.shared_for(uid)
+        if self.fsk_max(uid) is not None:
+            keys = [r.get("key") for r in inbox] + [k for sl in shared for k in sl["items"]]
+            ok = await self.fsk_allowed(uid, [k for k in keys if isinstance(k, str)])
+            inbox = [r for r in inbox if r.get("key") in ok]
+            for sl in shared:
+                sl["items"] = {k: v for k, v in sl["items"].items() if k in ok}
+                sl["status"] = {k: v for k, v in sl["status"].items() if k in ok}
         return {
             "user_id": uid,
             "user_name": connection.user.name,
@@ -1035,7 +1109,7 @@ class Filmtracker:
             "notify_guess": self.guess_notify(uid),
             "push": u.get("push", True),
             "share": u.get("share", True),
-            "inbox": u.get("inbox", []),
+            "inbox": inbox,
             "log": u.get("log", []),
             "remotes": self.tv_devices(),
             "apps": self.apps(),
@@ -1054,7 +1128,7 @@ class Filmtracker:
                 ({"id": k, "name": v} for k, v in self.names.items() if k != uid),
                 key=lambda p: p["name"].lower(),
             ),
-            "shared": self.shared_for(uid),
+            "shared": shared,
             "notify_services": self.notify_services(),
             "ai_entities": self.ai_entities(),
             "ai_names": {
@@ -1114,6 +1188,12 @@ class Filmtracker:
                     result = await resp.json()
         except TimeoutError as err:
             raise HomeAssistantError("TMDb Zeitüberschreitung") from err
+        except HomeAssistantError:
+            raise
+        except Exception as err:  # noqa: BLE001
+            # Die Fehlermeldung von aiohttp kann die komplette URL samt api_key enthalten.
+            _LOGGER.debug("Filmtracker: TMDb-Anfrage %s fehlgeschlagen (%s)", path, type(err).__name__)
+            raise HomeAssistantError("TMDb nicht erreichbar") from None
         if cache:
             if len(self._cache) > 3000:
                 self._cache.clear()
@@ -1421,13 +1501,17 @@ async def ws_settings_save(hass, connection, msg):
 async def ws_tmdb(hass, connection, msg):
     if not (ft := _ft(hass, connection, msg)):
         return
+    params = dict(msg.get("params") or {})
+    if ft.fsk_max(connection.user.id) is not None:
+        params["include_adult"] = "false"
     try:
-        res = await ft.tmdb(msg["path"], msg.get("params"))
+        res = await ft.tmdb(msg["path"], params)
+        res = await ft.fsk_filter_tmdb(connection.user.id, msg["path"], res)
     except HomeAssistantError as err:
         connection.send_error(msg["id"], "tmdb_error", str(err))
         return
-    except Exception as err:  # noqa: BLE001
-        connection.send_error(msg["id"], "tmdb_error", f"TMDb nicht erreichbar: {err}")
+    except Exception:  # noqa: BLE001
+        connection.send_error(msg["id"], "tmdb_error", "TMDb nicht erreichbar")
         return
     connection.send_result(msg["id"], res)
 
@@ -1551,6 +1635,8 @@ async def ws_recommend(hass, connection, msg):
     sent = 0
     for uid in msg["to"]:
         if uid == me or uid not in ft.names:
+            continue
+        if key not in await ft.fsk_allowed(uid, [key]):
             continue
         u = ft.user(uid)
         u["inbox"] = [r for r in u["inbox"] if not (r["key"] == key and r["from"] == me)]
