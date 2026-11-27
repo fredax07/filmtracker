@@ -273,10 +273,14 @@ function tvButtons(p) {
   const remotes = S.u.remotes || []; const apps = S.u.apps || {};
   if (!p || !remotes.length) return "";
   const hasAlexa = remotes.some((r) => r.kind === "alexa");
-  const provs = p.flat.filter((v) => apps[String(v.provider_id)] || (hasAlexa && abos().includes(v.provider_id)));
+  // Nur eigene Abos, in denen der Titel wirklich enthalten ist (Werbe-Varianten zählen als Hauptanbieter)
+  const VARIANT = { 1796: 8, 2100: 9 };
+  const mine = abos(); const seen = new Set();
+  const provs = p.flat.map((v) => (VARIANT[v.provider_id] ? { ...v, provider_id: VARIANT[v.provider_id], provider_name: (p.flat.find((z) => z.provider_id === VARIANT[v.provider_id]) || v).provider_name.replace(/ (Standard )?with Ads$/i, "") } : v))
+    .filter((v) => mine.includes(v.provider_id) && (apps[String(v.provider_id)] || hasAlexa) && !seen.has(v.provider_id) && seen.add(v.provider_id));
   if (!provs.length) return "";
   const cur = lsGet("ft_remote") || remotes[0].id;
-  return '<div class="row" style="margin-top:10px">' + (remotes.length > 1 ? '<select id="tvsel" style="width:auto">' + remotes.map((r) => '<option value="' + r.id + '"' + (r.id === cur ? " selected" : "") + ">" + (r.kind === "remote" ? "📺 " : "🔥 ") + esc(r.name) + (r.kind === "alexa" ? " (Alexa)" : "") + "</option>").join("") + "</select>" : "") + provs.map((v) => '<button class="btn" data-play="' + v.provider_id + '">▶ ' + esc(v.provider_name) + " auf TV öffnen</button>").join("") + "</div>";
+  return '<div class="row" style="margin-top:10px">' + (remotes.length > 1 ? '<select id="tvsel" style="width:auto">' + remotes.map((r) => '<option value="' + r.id + '"' + (r.id === cur ? " selected" : "") + ">" + (r.kind === "alexa" ? "🔥 " : "📺 ") + esc(r.name) + (r.kind === "alexa" ? " (Alexa)" : "") + "</option>").join("") + "</select>" : "") + provs.map((v) => '<button class="btn" data-play="' + v.provider_id + '">▶ ' + esc(v.provider_name) + " auf TV öffnen</button>").join("") + "</div>";
 }
 function bindTv(d) {
   const sel = $("#tvsel"); if (sel) sel.onchange = () => lsSet("ft_remote", sel.value);
@@ -284,7 +288,7 @@ function bindTv(d) {
     const remotes = S.u.remotes || []; const remote = (sel && sel.value) || lsGet("ft_remote") || (remotes[0] && remotes[0].id);
     if (!remotes.find((r) => r.id === remote)) { toast("Kein Fernseher gefunden."); return; }
     b.disabled = true;
-    try { const r = await ws({ type: "filmtracker/play", remote, provider: +b.dataset.play, title: d ? d.title : "", key: d ? kOf(d.type, d.tmdb) : "" }); toast((r.command ? "🔥 An Fire TV gesendet: „" + r.command + "“" : "📺 App wird auf dem Fernseher geöffnet") + (r.ask ? " – ich frag dich später, ob du fertig bist" : ""), 4000); } catch (e) { toast("Fehler: " + errMsg(e), 4000); }
+    try { const r = await ws({ type: "filmtracker/play", remote, provider: +b.dataset.play, title: d ? d.title : "", key: d ? kOf(d.type, d.tmdb) : "" }); toast((r.command ? "🔥 An Fire TV gesendet: „" + r.command + "“" : r.deep === "search" ? "📺 Suche nach dem Titel wird auf dem Fernseher geöffnet" : r.deep ? "📺 Titel wird auf dem Fernseher geöffnet – nur noch ▶ drücken" : "📺 App wird auf dem Fernseher geöffnet") + (r.ask ? " – ich frag dich später, ob du fertig bist" : ""), 4000); } catch (e) { toast("Fehler: " + errMsg(e), 4000); }
     b.disabled = false;
   }));
 }
@@ -527,6 +531,7 @@ async function viewSettings() {
     (u.is_admin ? '<div class="card"><h2 style="margin-top:0">KI (für alle)</h2><div>Primär<select id="ki1">' + opt(st.ki_primary) + '</select></div><div style="margin-top:8px">Fallback (wenn Primär überlastet / Fehler)<select id="ki2">' + opt(st.ki_fallback) + '</select></div><div class="row" style="margin-top:8px"><button class="btn" id="testki">KI testen</button><span id="kires" class="small muted"></span></div>' + (u.own_abos ? "" : '<div class="small muted" style="margin-top:8px">Deine Abo-Auswahl oben gilt als Standard für alle, die keine eigene haben.</div>') + "</div>" : '<div class="card small muted">KI: ' + esc(st.ki_primary || "–") + (st.ki_fallback ? " · Fallback: " + esc(st.ki_fallback) : "") + " (einstellbar durch Admin)</div>") +
     (u.is_admin && (u.remotes || []).length ? '<div class="card"><h2 style="margin-top:0">📺 TV-Apps</h2><div class="small muted" style="margin-bottom:6px">Welche Android-TV-App beim „Auf TV öffnen“ startet (Paketname).</div>' + abos().map((id) => { const pv = (S.providers || []).find((p) => p.provider_id === id); return '<div class="row" style="margin:4px 0;flex-wrap:nowrap"><span class="small" style="width:140px;flex:none">' + esc(pv ? pv.provider_name : "Anbieter " + id) + '</span><input type="text" data-app="' + id + '" value="' + esc((u.apps || {})[String(id)] || "") + '" placeholder="z. B. com.anbieter.app"></div>'; }).join("") + '<button class="btn sm" id="saveapps" style="margin-top:6px">Speichern</button></div>' : "") +
     (u.is_admin ? '<div class="card"><h2 style="margin-top:0">🔞 Altersfreigabe (FSK)</h2><div class="small muted" style="margin-bottom:6px">Pro Person: Suche, Tipps und Releases zeigen nur Titel bis zu dieser Freigabe. Titel ohne bekannte Freigabe werden dann ausgeblendet.</div>' + [{ id: u.user_id, name: u.user_name + " (du)" }].concat(u.people || []).map((p) => { const v = (u.people_fsk || {})[p.id]; return '<div class="row" style="margin:4px 0;flex-wrap:nowrap"><span class="small" style="width:140px;flex:none">' + esc(p.name) + '</span><select data-fsk="' + p.id + '" style="width:auto"><option value="">keine Grenze</option>' + [0, 6, 12, 16, 18].map((n) => '<option value="' + n + '"' + (v === n ? " selected" : "") + ">bis FSK " + n + "</option>").join("") + "</select></div>"; }).join("") + "</div>" : (u.max_fsk != null ? '<div class="card small muted">🔞 Für dich gilt: Titel bis FSK ' + u.max_fsk + ".</div>" : "")) +
+    tvProfileCard(u) +
     traktCard(u) +
     '<div class="card"><h2 style="margin-top:0">Export</h2><div class="small muted">Alle deine Titel als CSV (öffnet in Excel).</div><button class="btn" id="export" style="margin-top:8px">⬇ CSV herunterladen</button></div>' +
     (hasOld ? '<div class="card"><h2 style="margin-top:0">Alte Daten übernehmen</h2><div class="small muted">Übernimmt die Titel aus der alten To-do-Liste „Filmtracker“ in <b>deine</b> Listen.</div><div class="row" style="margin-top:8px"><button class="btn pri" id="migrate">Übernehmen</button><span id="migres" class="small muted"></span></div></div>' : "") +
@@ -534,6 +539,7 @@ async function viewSettings() {
 
   $("#push").onchange = async (e) => { await saveUser({ push: e.target.checked }); toast("Gespeichert"); };
   $("#autoask").onchange = async (e) => { await saveUser({ autoask: e.target.checked }); toast("Gespeichert"); };
+  $$("[data-tvprof]").forEach((sel) => (sel.onchange = async () => { await saveUser({ tv_profiles: { [sel.dataset.tvprof]: sel.value === "" ? null : +sel.value } }); toast("Gespeichert"); }));
   bindTrakt();
   $("#share").onchange = async (e) => { await saveUser({ share: e.target.checked }); toast("Gespeichert"); };
   $("#notify").onchange = async (e) => { await saveUser({ notify: e.target.value || null }); toast("Gespeichert"); };
@@ -550,8 +556,15 @@ async function viewSettings() {
   $$("[data-fsk]").forEach((sel) => (sel.onchange = async () => { try { await wsU({ type: "filmtracker/admin/user", uid: sel.dataset.fsk, max_fsk: sel.value === "" ? null : +sel.value }); toast("Gespeichert"); } catch (e) { toast("Fehler: " + errMsg(e)); } }));
   const sa = $("#saveapps"); if (sa) sa.onclick = async () => { const apps = {}; $$("[data-app]").forEach((i) => (apps[i.dataset.app] = i.value.trim())); try { await saveSettings({ apps }); toast("TV-Apps gespeichert"); } catch (e) { toast("Fehler: " + errMsg(e)); } };
   try {
-    if (!S.providers) { const r = await tmdb("watch/providers/movie", { watch_region: "DE" }); S.providers = (r.results || []).sort((a, b) => ((a.display_priorities || {}).DE || 99) - ((b.display_priorities || {}).DE || 99)).slice(0, 45); }
     const mine = abos();
+    if (!S.providers) {
+      const [rm, rt] = await Promise.all([tmdb("watch/providers/movie", { watch_region: "DE" }), tmdb("watch/providers/tv", { watch_region: "DE" })]);
+      const all = new Map(); [...(rm.results || []), ...(rt.results || [])].forEach((p) => { if (!all.has(p.provider_id)) all.set(p.provider_id, p); });
+      const prio = (p) => { const v = (p.display_priorities || {}).DE; return typeof v === "number" ? v : 999; };
+      const sorted = [...all.values()].sort((a, b) => prio(a) - prio(b));
+      // Die beliebtesten 45 plus alle schon gewählten Abos
+      S.providers = sorted.filter((p, i) => i < 45 || mine.includes(p.provider_id));
+    }
     $("#abos").innerHTML = S.providers.map((p) => '<label><input type="checkbox" value="' + p.provider_id + '"' + (mine.includes(p.provider_id) ? " checked" : "") + '><img src="' + IMG + "w92" + p.logo_path + '">' + esc(p.provider_name) + "</label>").join("");
     $$("#abos input").forEach((c) => (c.onchange = async () => {
       const ids = [...$$("#abos input:checked")].map((x) => +x.value);
@@ -561,6 +574,12 @@ async function viewSettings() {
   } catch (e) { $("#abos").textContent = "Fehler: " + errMsg(e); }
 }
 
+function tvProfileCard(u) {
+  if (!(S.u.remotes || []).some((r) => r.kind === "firetv")) return "";
+  const prof = u.tv_profiles || {};
+  const sel = (id, name) => '<div class="row" style="margin-top:6px"><span style="min-width:90px">' + name + '</span><select data-tvprof="' + id + '" style="width:auto"><option value="">nicht wählen</option>' + [1, 2, 3, 4, 5, 6, 7, 8].map((n) => '<option value="' + n + '"' + (prof[id] === n ? " selected" : "") + ">Profil " + n + (id === "9" || id === "8" ? " von oben" : " von links") + "</option>").join("") + "</select></div>";
+  return '<div class="card"><h2 style="margin-top:0">📺 Mein Profil auf dem Fernseher</h2><div class="small muted">Nur bei Fernsehern über ADB: Die App wird neu gestartet und dein Profil automatisch gewählt. Zähle bei Disney+ von links, bei Netflix und Prime von oben, das erste Profil ist 1.</div>' + sel("8", "Netflix") + sel("337", "Disney+") + sel("9", "Prime Video") + "</div>";
+}
 function traktCard(u) {
   const t = u.trakt || {};
   let h = '<div class="card"><h2 style="margin-top:0">🔗 Trakt</h2>';

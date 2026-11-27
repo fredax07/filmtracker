@@ -11,6 +11,7 @@ Film- und Serien-Tracker als Home-Assistant-Integration – pro Person, mit Teil
 - **Kino & Releases der Woche**, Leih-/Kauf-Alarm wenn ein Film digital erscheint
 - **Teilen**: Titel empfehlen, gemeinsame Listen, Bewertungen & Fortschritt der anderen, Abstimmung „Was schauen wir?“
 - **Auf TV öffnen**: Android TV / Google TV, Fire TV (ADB oder Alexa-Cloud, auch an anderen Orten)
+  - Netflix springt direkt zur Seite des Titels, Disney+ öffnet die Suche mit dem Titel (Android/Google TV über Android TV Remote oder ADB). Die Netflix-ID kommt von Wikidata. Über ADB öffnet auch Prime Video die Suche, und pro Person kann das Netflix-, Disney+- und Prime-Profil automatisch gewählt werden.
 - **Auto-Abhaken**: nach „Auf TV öffnen“ fragt eine Push-Nachricht, ob du fertig bist
 - **Trakt-Sync** in beide Richtungen (Verlauf, Bewertungen, Watchlist)
 - **Sprachbefehle (Assist)**: „Was soll ich heute schauen?“, „Gibt es neue Folgen?“, „Setz Dune auf meine Watchlist“
@@ -19,9 +20,11 @@ Film- und Serien-Tracker als Home-Assistant-Integration – pro Person, mit Teil
 ## Installation (HACS)
 [![In HACS öffnen](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=fredax07&repository=filmtracker&category=integration)
 
-1. HACS → ⋮ → **Benutzerdefinierte Repositories** → `https://github.com/fredax07/filmtracker`, Typ **Integration**
+1. In HACS nach **Filmtracker** suchen (oder den Button oben nutzen)
 2. „Filmtracker“ herunterladen und Home Assistant neu starten
 3. **Einstellungen → Geräte & Dienste → Integration hinzufügen → Filmtracker**
+
+Alternativ als benutzerdefiniertes Repository: HACS → ⋮ → **Benutzerdefinierte Repositories** → `https://github.com/fredax07/filmtracker`, Typ **Integration**.
 
 Das Panel erscheint danach in der Seitenleiste als **Filmtracker**.
 
