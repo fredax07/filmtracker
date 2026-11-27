@@ -9,6 +9,7 @@ import random
 import re
 import secrets
 import time
+from urllib.parse import quote
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -77,6 +78,17 @@ PLATFORMS = ["sensor", "calendar"]
 LOG_MAX = 20000
 # Fire TV hat für Prime Video eine eigene App
 FIRETV_APPS = {"9": "com.amazon.firebat"}
+NETFLIX = "8"
+DISNEY = "337"
+PRIME = "9"
+# Apps mit Profilauswahl beim Start: Paket, Wartezeit bis zur Profilauswahl (Sekunden), Richtung der Liste
+PROFILE_APPS = {
+    NETFLIX: ("com.netflix.ninja", 12, "v"),
+    DISNEY: ("com.disney.disneyplus", 10, "h"),
+    PRIME: ("com.amazon.amazonvideo.livingroom", 8, "v"),
+}
+WIKIDATA_URL = "https://query.wikidata.org/sparql"
+_RE_NETFLIX_ID = re.compile(r"^\d{5,12}$")
 RELEASE_TYPES = {1: "Premiere", 2: "Kino (limitiert)", 3: "Kinostart", 4: "Digital", 5: "DVD/Blu-ray", 6: "TV"}
 
 
@@ -258,6 +270,7 @@ class Filmtracker:
         self._unsub = None
         self.sessions: dict[str, dict[str, Any]] = {}
         self._trakt_pending: dict[str, asyncio.Task] = {}
+        self._stream_ids: dict[str, tuple[float, str | None]] = {}
 
     # ---------- Grundlagen ----------
     @property
@@ -306,12 +319,13 @@ class Filmtracker:
 
     def tv_devices(self) -> list[dict[str, str]]:
         """Android-TV-Fernbedienungen und Fire TV (ADB-Integration)."""
+        reg = er.async_get(self.hass)
+        adb_remotes = {e.entity_id for e in reg.entities.values() if e.platform == "androidtv" and e.domain == "remote"}
         out = [
             {"id": s.entity_id, "name": s.name, "kind": "remote"}
             for s in self.hass.states.async_all("remote")
-            if s.state != "unavailable"
+            if s.state != "unavailable" and s.entity_id not in adb_remotes
         ]
-        reg = er.async_get(self.hass)
         for ent in reg.entities.values():
             if ent.platform == "androidtv" and ent.domain == "media_player":
                 st = self.hass.states.get(ent.entity_id)
@@ -327,6 +341,40 @@ class Filmtracker:
                 if "fire" in label and "tv" in label:
                     out.append({"id": f"alexa:{dev.id}", "name": dev.name_by_user or dev.name or "Fire TV", "kind": "alexa"})
         return out
+
+    async def async_netflix_id(self, key: str) -> str | None:
+        """Netflix-ID eines Titels über Wikidata (TMDb-ID -> P1874), 7 Tage zwischengespeichert."""
+        typ, _, tid = key.partition(":")
+        if typ not in ("movie", "tv") or not tid.isdigit():
+            return None
+        now = time.monotonic()
+        if (hit := self._stream_ids.get(key)) and hit[0] > now:
+            return hit[1]
+        prop = "P4947" if typ == "movie" else "P4983"
+        query = f'SELECT ?n WHERE {{ ?i wdt:{prop} "{tid}" . ?i wdt:P1874 ?n . }} LIMIT 1'
+        nid: str | None = None
+        ttl = 7 * 86400
+        try:
+            session = async_get_clientsession(self.hass)
+            async with asyncio.timeout(10):
+                async with session.get(
+                    WIKIDATA_URL,
+                    params={"query": query, "format": "json"},
+                    headers={"User-Agent": f"HomeAssistant-Filmtracker/{VERSION} (https://github.com/fredax07/filmtracker)"},
+                ) as resp:
+                    if resp.status != 200:
+                        raise HomeAssistantError(f"Wikidata {resp.status}")
+                    data = await resp.json(content_type=None)
+            rows = (data.get("results") or {}).get("bindings") or []
+            val = str(((rows[0] if rows else {}).get("n") or {}).get("value") or "")
+            nid = val if _RE_NETFLIX_ID.match(val) else None
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Filmtracker: Wikidata-Abfrage für %s fehlgeschlagen (%s)", key, type(err).__name__)
+            ttl = 600
+        if len(self._stream_ids) > 2000:
+            self._stream_ids.clear()
+        self._stream_ids[key] = (now + ttl, nid)
+        return nid
 
     def apps(self) -> dict[str, str]:
         apps = dict(DEFAULT_APPS)
@@ -1115,6 +1163,7 @@ class Filmtracker:
             "apps": self.apps(),
             "max_fsk": u.get("max_fsk"),
             "autoask": u.get("autoask", True),
+            "tv_profiles": u.get("tv_profiles") or {},
             "trakt": {
                 "configured": all(self.trakt_conf()),
                 "connected": bool((u.get("trakt") or {}).get("access")),
@@ -1443,6 +1492,7 @@ async def ws_item_remove(hass, connection, msg):
         vol.Optional("push"): bool,
         vol.Optional("share"): bool,
         vol.Optional("autoask"): bool,
+        vol.Optional("tv_profiles"): {vol.In(list(PROFILE_APPS)): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=1, max=8)))},
         vol.Optional("dismissed"): vol.All([str], vol.Length(max=2000)),
     }
 )
@@ -1458,6 +1508,10 @@ async def ws_user_save(hass, connection, msg):
     for key in ("push", "share", "autoask"):
         if key in msg:
             u[key] = msg[key]
+    if "tv_profiles" in msg:
+        prof = dict(u.get("tv_profiles") or {})
+        prof.update(msg["tv_profiles"])
+        u["tv_profiles"] = {k: v for k, v in prof.items() if v}
     if "dismissed" in msg:
         u["dismissed"] = msg["dismissed"][-1000:]
     ft.save()
@@ -1585,8 +1639,144 @@ async def ws_play(hass, connection, msg):
     if not pkg:
         connection.send_error(msg["id"], "no_app", "Für diesen Anbieter ist keine TV-App hinterlegt")
         return
+    deep = False
+    title = (msg.get("title") or "").strip()
+    # Prime Video öffnet die Suche, wenn der Link direkt an die App geht (sonst kommt die Browser-Auswahl)
+    # (Bei ADB-Geräten steht pkg auf der Fire-TV-App, daher das Android-TV-Paket fest – fehlt es, nur die App öffnen)
+    pv = PROFILE_APPS[PRIME][0]
+    prime_search = (
+        f"if pm path {pv} >/dev/null 2>&1; then am start -a android.intent.action.VIEW -p {pv} "
+        f"-d 'https://app.primevideo.com/search?phrase={quote(title)}'; "
+        f"else monkey -p {pkg} -c android.intent.category.LEANBACK_LAUNCHER 1; fi"
+        if str(msg["provider"]) == PRIME and title and dev["kind"] == "firetv" else None
+    )
     try:
-        if dev["kind"] == "firetv":
+        nid = None
+        if dev["kind"] in ("firetv", "remote") and str(msg["provider"]) == NETFLIX and msg.get("key"):
+            nid = await ft.async_netflix_id(msg["key"])
+        profile = (ft.user(connection.user.id).get("tv_profiles") or {}).get(str(msg["provider"]))
+        _LOGGER.debug("Filmtracker Abspielen: App %s, Gerät %s (%s), Profil %s", msg["provider"], remote, dev["kind"], profile)
+        if profile and dev["kind"] == "firetv" and str(msg["provider"]) in PROFILE_APPS:
+            # App frisch starten, damit die Profilauswahl sicher erscheint, dann Profil per Tasten wählen
+            pkg_p, wait, direction = PROFILE_APPS[str(msg["provider"])]
+            if str(msg["provider"]) == NETFLIX:
+                start = (
+                    "am start -c android.intent.category.LEANBACK_LAUNCHER -a android.intent.action.VIEW "
+                    + (f"-d https://www.netflix.com/title/{nid} " if nid else "")
+                    + "-f 0x10808000 -e source 30 com.netflix.ninja/.MainActivity"
+                )
+            else:
+                start = f"monkey -p {pkg_p} -c android.intent.category.LEANBACK_LAUNCHER 1"
+            # Erst ganz an den Anfang der Liste, dann zum Profil, dann OK (links/rechts bzw. hoch/runter)
+            back, step = ("21", "22") if direction == "h" else ("19", "20")
+            # Mit Pausen: Apps wie Disney+ verschlucken schnell aufeinanderfolgende Tasten
+            keys = "; ".join(
+                [f"input keyevent {back}; sleep 0.4"] * 8 + ["sleep 1.5"]
+                + [f"input keyevent {step}; sleep 1.2"] * (int(profile) - 1) + ["sleep 0.5; input keyevent 23"]
+            )
+
+            async def adb(cmd: str) -> None:
+                await hass.services.async_call(
+                    "androidtv", "adb_command", {"entity_id": remote, "command": cmd},
+                    blocking=True, context=connection.context(msg),
+                )
+
+            await adb(f"am force-stop {pkg_p}; sleep 1; {start}")
+            await asyncio.sleep(wait)
+            # Netflix und Prime Video ignorieren Pfeiltasten über ADB, nehmen sie aber über die Android-TV-Remote-Verbindung an
+            tv_remote = None
+            if str(msg["provider"]) in (NETFLIX, PRIME):
+                remotes = [d for d in ft.tv_devices() if d["kind"] == "remote"]
+                base = dev["name"].replace("(ADB)", "").strip().lower()
+                tv_remote = next((r["id"] for r in remotes if r["name"].strip().lower() == base), None)
+                if not tv_remote and len(remotes) == 1:
+                    tv_remote = remotes[0]["id"]
+            _LOGGER.debug(
+                "Filmtracker Profil: App %s, Profil %s, Gerät %s, Fernbedienung %s",
+                msg["provider"], profile, remote, tv_remote,
+            )
+            if tv_remote:
+                b, st = ("DPAD_LEFT", "DPAD_RIGHT") if direction == "h" else ("DPAD_UP", "DPAD_DOWN")
+
+                async def rc(cmds: list[str], delay: float) -> None:
+                    await hass.services.async_call(
+                        "remote", "send_command",
+                        {"entity_id": tv_remote, "command": cmds, "delay_secs": delay},
+                        blocking=True, context=connection.context(msg),
+                    )
+
+                async def pick() -> None:
+                    # Langsam und lange nach oben: Netflix setzt die Markierung beim Laden aufs zuletzt genutzte Profil
+                    await rc([b] * 12, 1.0)
+                    await asyncio.sleep(1.5)
+                    if int(profile) > 1:
+                        await rc([st] * (int(profile) - 1), 1.0)
+                    await asyncio.sleep(0.8)
+                    await rc(["DPAD_CENTER"], 0.4)
+
+                await pick()
+                if prime_search:
+                    # Prime zeigt bei einem Link erneut die Profilauswahl und danach die Suche
+                    await asyncio.sleep(6)
+                    await adb(prime_search)
+                    await asyncio.sleep(4)
+                    await pick()
+                if nid:
+                    # Titel erst nach der Profilwahl öffnen
+                    await asyncio.sleep(6)
+                    await adb(
+                        f"am start -a android.intent.action.VIEW -d https://www.netflix.com/title/{nid} "
+                        "-f 0x10000000 -e source 30 com.netflix.ninja/.MainActivity"
+                    )
+            else:
+                await adb(keys)
+            deep = "search" if prime_search else bool(nid)
+            if str(msg["provider"]) == DISNEY and (msg.get("title") or "").strip():
+                url = "https://www.disneyplus.com/search?q=" + quote(msg["title"].strip())
+                await asyncio.sleep(4)
+                await adb(f"am start -a android.intent.action.VIEW -f 0x14000000 -d '{url}' com.disney.disneyplus")
+                deep = "search"
+        elif nid and dev["kind"] == "remote":
+            # Android TV Remote: Netflix öffnet den Titel nur mit "?source=30"
+            await hass.services.async_call(
+                "remote", "turn_on",
+                {"entity_id": remote, "activity": f"https://www.netflix.com/title/{nid}?source=30"},
+                blocking=True, context=connection.context(msg),
+            )
+            deep = True
+        elif nid:
+            # Direkt auf die Titelseite springen (braucht ADB: Netflix ignoriert Links ohne "source 30")
+            await hass.services.async_call(
+                "androidtv", "adb_command",
+                {
+                    "entity_id": remote,
+                    "command": "am start -c android.intent.category.LEANBACK_LAUNCHER -a android.intent.action.VIEW "
+                    f"-d https://www.netflix.com/title/{nid} -f 0x10808000 -e source 30 com.netflix.ninja/.MainActivity",
+                },
+                blocking=True, context=connection.context(msg),
+            )
+            deep = True
+        elif str(msg["provider"]) == DISNEY and (msg.get("title") or "").strip() and dev["kind"] in ("firetv", "remote"):
+            # Disney+ nimmt keine Titel-Links an, aber eine Suche mit Suchbegriff
+            url = "https://www.disneyplus.com/search?q=" + quote(msg["title"].strip())
+            if dev["kind"] == "remote":
+                await hass.services.async_call(
+                    "remote", "turn_on", {"entity_id": remote, "activity": url}, blocking=True, context=connection.context(msg)
+                )
+            else:
+                await hass.services.async_call(
+                    "androidtv", "adb_command",
+                    {"entity_id": remote, "command": f"am start -a android.intent.action.VIEW -f 0x14000000 -d '{url}' com.disney.disneyplus"},
+                    blocking=True, context=connection.context(msg),
+                )
+            deep = "search"
+        elif prime_search and dev["kind"] == "firetv":
+            await hass.services.async_call(
+                "androidtv", "adb_command", {"entity_id": remote, "command": prime_search},
+                blocking=True, context=connection.context(msg),
+            )
+            deep = "search"
+        elif dev["kind"] == "firetv":
             await hass.services.async_call(
                 "media_player", "select_source", {"entity_id": remote, "source": pkg}, blocking=True, context=connection.context(msg)
             )
@@ -1598,7 +1788,7 @@ async def ws_play(hass, connection, msg):
         connection.send_error(msg["id"], "play_error", str(err))
         return
     asked = ft.start_session(connection.user.id, msg.get("key") or "", dev, pkg)
-    connection.send_result(msg["id"], {"ok": True, "app": pkg, "ask": asked})
+    connection.send_result(msg["id"], {"ok": True, "app": pkg, "ask": asked, "deep": deep})
 
 
 # ---------- Teilen ----------
