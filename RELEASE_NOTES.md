@@ -6,4 +6,4 @@
 - 📺 „Auf TV öffnen“ zeigt nur noch Anbieter aus deinen eigenen Abos, in denen der Titel wirklich enthalten ist.
 - 🐛 Netflix fehlte in der Abo-Auswahl (Sortierfehler) – jetzt wieder ganz oben; bereits gewählte Abos werden immer angezeigt.
 - 📺 Die zusätzliche Fernbedienungs-Entität der ADB-Integration wird in der Geräteauswahl nicht mehr doppelt angezeigt.
-- 📦 Filmtracker ist jetzt im HACS-Standardkatalog – einfach in HACS nach „Filmtracker“ suchen.
+- 📦 Filmtracker ist jetzt im HACS/Marketplace – einfach dort nach „Filmtracker“ suchen.

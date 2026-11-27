@@ -17,10 +17,10 @@ Film- und Serien-Tracker als Home-Assistant-Integration – pro Person, mit Teil
 - **Sprachbefehle (Assist)**: „Was soll ich heute schauen?“, „Gibt es neue Folgen?“, „Setz Dune auf meine Watchlist“
 - Sensoren & Kalender pro Person, Dashboard-Karte `custom:filmtracker-card`, Statistik & Jahresrückblick, CSV-Export, FSK-Filter
 
-## Installation (HACS)
+## Installation (HACS/Marketplace)
 [![In HACS öffnen](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=fredax07&repository=filmtracker&category=integration)
 
-1. In HACS nach **Filmtracker** suchen (oder den Button oben nutzen)
+1. Im **HACS/Marketplace** nach **Filmtracker** suchen (oder den Button oben nutzen)
 2. „Filmtracker“ herunterladen und Home Assistant neu starten
 3. **Einstellungen → Geräte & Dienste → Integration hinzufügen → Filmtracker**
 
